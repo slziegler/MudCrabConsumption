@@ -1,0 +1,114 @@
+---
+title: "Mud Crab Consumption and Density"
+author: "Shelby L Ziegler"
+date: "2024-09-08"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Set theme open packages 
+
+```{r}
+library(tidyverse)
+theme_set(theme_classic(base_size=20))
+```
+
+Read in consumption data
+
+```{r}
+con<-read.csv("SapConsumpData.csv")
+
+str(con)
+con1<-con%>%
+  group_by(Date,edge.type, replicate, prey.type)%>%
+  summarize(prop=sum(present.absent)/n())
+
+con1<-con1[-1,]
+
+con1$prop.con<-(1-con1$prop)
+
+con2<-con1%>%
+  group_by(edge.type, prey.type)%>%
+  summarize(meancon=mean(prop.con), se=plotrix::std.error(prop.con))
+
+#Run Anova
+#aov1<-aov(prop.con~edge.type*prey.type, data=con1)
+#summary(aov1)
+shapiro.test(con1$prop.con)
+
+mudX1<-filter(con1,  prey.type=="mud crab")
+
+mudX<-filter(con2,  prey.type=="mud crab")
+
+mudX$edge.type<-factor(mudX$edge.type, level=c("slope", "slump", "scarp"))
+
+ggplot(mudX, aes(x=edge.type, y=meancon, fill=edge.type))+
+  geom_bar(stat="identity", color="black")+
+  geom_errorbar(aes(ymax=meancon+se, ymin=meancon-se), width=0.2)+
+  theme_bw(base_size=16)+ 
+  ylab("Mud crabs consumed (%)")+
+  xlab("Marsh edge morphology")+
+  theme(legend.position = "none")+
+  scale_fill_manual(values=c('#a6611a','#f5f5f5', '#018571'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+mud<-filter(con,  prey.type=="mud crab")
+
+mud2<-table(mud$present.absent, mud$edge.type)
+
+#One way to look at posthoc test 
+test <- chisq.test(table(mud$present.absent,mud$edge.type))
+test
+
+#Look at different way to run chi square
+mud3<-mud2[,-1]
+rownames(mud3)<-mud2[,1]
+rot <- function(x) t(apply(x, 2, rev))
+mud4<-rot(mud3)
+
+rstatix::chisq_test(mud4)
+rstatix::pairwise_chisq_gof_test(mud4)
+```
+
+Examine mud crab densities. 
+
+```{r}
+mudc<-read.csv("Mudcrabcounts.csv")
+
+mudc1<-mudc%>%
+  #filter(edge.type!="scarp")%>%
+  group_by(edge.type)
+
+mudc2<-mudc1%>%
+  group_by(edge.type)%>%
+  summarize(meancount=mean(burrow.count), std=sd(burrow.count))  
+mudc1$edge.type<-factor(mudc1$edge.type, level=c("slope", "slump", "scarp"))
+
+mudc2a<-mudc%>%
+  summarize(meancount=mean(burrow.count), std=sd(burrow.count))  
+#Run one-way anova
+av1<-aov(burrow.count~edge.type, data=mudc1)
+
+r2<-resid(av1)
+##Are residuals normal distributed? 
+shapiro.test(r2)
+#Are residuals homoskedasktic? 
+lmtest::bgtest(av1)
+
+#output from anova
+summary(av1)
+#Tukey posthoc test.
+TukeyHSD(aov(burrow.count~edge.type, data=mudc1))
+
+
+#Plot up data
+ggplot(mudc1, aes(x=edge.type, y=(burrow.count*4), fill=edge.type))+
+  geom_boxplot()+
+  theme_bw(base_size=16)+
+labs(y=expression(Mud~crab~burrow~density~(no.~0.25~m^-2)), x=expression(Marsh~edge~morphology))+
+  theme(legend.position = "none")+
+  scale_fill_manual(values=c('#a6611a','#f5f5f5', '#018571'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
