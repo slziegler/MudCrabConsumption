@@ -1,0 +1,104 @@
+---
+title: "Gibbs-MudCrabConsumption"
+author: "Grace Gibbs & Shelby Ziegler"
+date: "2023-07-31"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+theme_set(theme_classic(base_size=20))
+```
+
+Read in consumption data. Filter out dried squid assay and examine patterns in consumption of mud crabs by edge type
+
+```{r}
+#Read in datafile and filter for only mud crab consumption data
+con<-read.csv("Mud crab/SapConsumpData.csv")%>%
+  filter(prey.type=="mud crab")
+
+#Calculate the proportion of mud crabs still present after assay. 
+con1<-con%>%
+  group_by(Date,edge.type, replicate)%>%
+  summarize(prop=sum(present.absent)/n())
+
+#Take 1-still present to get proportion of mud crabs consumed
+con1$prop.con<-(1-con1$prop)
+
+#Calcualte means and standard error
+con2<-con1%>%
+  group_by(edge.type, Date)%>%
+  summarize(meancon=mean(prop.con), se=plotrix::std.error(prop.con))
+
+#Capitalize edge types and reorder edge types for figure
+con2$edge.type <- plyr::revalue(con2$edge.type, c("slope"="Slope", "slump"="Slump", "scarp"="Scarp"))
+con2$edge.type<-factor(con2$edge.type, level=c("Slope", "Slump", "Scarp"))
+
+#Plot consumption data
+ggplot(con2, aes(x=edge.type, y=meancon, fill=edge.type))+
+  geom_boxplot()+
+  theme_bw(base_size=16)+
+  labs(y="Mud crabs consumed (%)", x=expression(Marsh~edge~morphology))+
+  theme(legend.position = "none")+
+  scale_fill_manual(values=c('#a6611a','#f5f5f5', '#018571'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+# Run binomial mixed effects model to assess differences in consumption among edge types with random effects of replicate and date (accounts for repeated measures design & potential non-independence of sites). 
+
+library(lme4)
+m <- glmer(present.absent ~ edge.type + (1|replicate)+(1|Date), data = con, family = binomial)
+#look at full model output (beta coefficients for each parameter)
+summary(m, corr=F)
+#examine R-squared values 
+MuMIn::r.squaredGLMM(m)
+#Get stats to report in manuscript (fixed effect compared to null model)
+car::Anova(m)
+```
+
+
+```{r}
+#Read in data 
+mud<-read.csv("Mud crab/Mudcrabcounts.csv")
+
+
+#Get averages per edge type
+mud1<-mud%>%
+  group_by(edge.type)%>%
+  summarize(meancount=mean(burrow.count), std=sd(burrow.count))  
+
+#reorder edge types. 
+mud1$edge.type<-factor(mud1$edge.type, level=c("slope", "slump", "scarp"))
+
+#Calculate means and standard error for scaled data (0.025 m^2)
+mud1a<-mud%>%
+  group_by(edge.type)%>%
+  summarize(meancount=mean(burrow.count*4), se=plotrix::std.error(burrow.count*4))  
+
+
+#Use negative binomial (for count data) regression to determine effects of edge type on burrow density with random effect of replicate to account potential non-independence of sites.   
+b1 <- glmer.nb((burrow.count*4) ~ edge.type + (1|replicate), data = mud)
+summary(b1, corr=F) #There is a singular fit of the model. 
+MuMIn::r.squaredGLMM(b1) # From R^2 output we can determine that the model does not converge and the random effect does not contribute to the variance explained by the model. 
+
+#Remove random effect and run a negative binomail model with only fixed effect of edge type. 
+b2<-MASS::glm.nb((burrow.count*4) ~ edge.type, data=mud)
+summary(b2) #Burrow counts are different at slumped edges
+MuMIn::r.squaredGLMM(b2) #R^2 = 0.71
+car::Anova(b2) # Differences in edge type 
+
+#Capitalize edge types and reorder edge types for figure
+mud1$edge.type <- plyr::revalue(mud1$edge.type, c("slope"="Slope", "slump"="Slump", "scarp"="Scarp"))
+mud1$edge.type<-factor(mud1$edge.type, level=c("Slope", "Slump", "Scarp"))
+
+#Plot burrow count data 
+ggplot(mud1, aes(x=edge.type, y=(burrow.count*4), fill=edge.type))+
+  geom_boxplot()+
+  theme_bw(base_size=16)+
+labs(y=expression(Mud~crab~burrow~density~(no.~0.25~m^-2)), x=expression(Marsh~edge~morphology))+
+  theme(legend.position = "none")+
+  scale_fill_manual(values=c('#a6611a','#f5f5f5', '#018571'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
