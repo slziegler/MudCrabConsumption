@@ -83,11 +83,10 @@ b1 <- glmer.nb((burrow.count*4) ~ edge.type + (1|replicate), data = mud)
 summary(b1, corr=F) #There is a singular fit of the model. 
 MuMIn::r.squaredGLMM(b1) # From R^2 output we can determine that the model does not converge and the random effect does not contribute to the variance explained by the model. 
 
-#Remove random effect and run a negative binomail model with only fixed effect of edge type. 
-b2<-MASS::glm.nb((burrow.count*4) ~ edge.type, data=mud)
-summary(b2) #Burrow counts are different at slumped edges
-MuMIn::r.squaredGLMM(b2) #R^2 = 0.71
-car::Anova(b2) # Differences in edge type 
+#Due to non-convergence of the model above - Use negative binomial (for count data) regression to determine effects of edge type and replicate (as a fixed effect) on burrow density. 
+b1a <- MASS::glm.nb((burrow.count*4) ~ edge.type * replicate, data = mud)
+summary(b1a, corr=F) #The model runs but neither replicate site nor interaction has a statistical effect on burrow count. 
+car::Anova(b1a)
 
 #Capitalize edge types and reorder edge types for figure
 mud1$edge.type <- plyr::revalue(mud1$edge.type, c("slope"="Slope", "slump"="Slump", "scarp"="Scarp"))
