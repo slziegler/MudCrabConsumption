@@ -1,6 +1,6 @@
 # MudCrabConsumption
 
-##### GitHub repository containing data and code accompanying the marsh edge morphology and consumption study (Gibbs et al. in review)
+##### GitHub repository containing data and code accompanying the marsh edge morphology and consumption study (Gibbs et al. 2025)
 
 ## Title: Influence of salt marsh edge morphology on cross-boundary consumption and prey density
 
